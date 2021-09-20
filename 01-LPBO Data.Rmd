@@ -1,0 +1,96 @@
+# Introduction {#Data1}
+
+```{r tidyr1, echo = FALSE, message = FALSE, warning = FALSE}
+
+library(knitr)
+opts_chunk$set(tidy.opts=list(width.cutoff=50), tidy = FALSE)
+
+```
+
+This code was write to help facilitate [Long Point Bird Observatory](https://www.birdscanada.org/bird-science/long-point-bird-observatory/) data summaries by staff and volunteers. This is a step-by-step guide which requires minimal experience with RStudio. 
+
+## Authorization {#Data1.1}
+
+To access data using the naturecounts R package, you must [sign up](https://www.birdscanada.org/birdmon/default/register.jsp) for a **free** account. Further, if you would like to access Level 3 or 4 collections you must make a [data request](https://www.birdscanada.org/birdmon/default/searchquery.jsp). Note: LPBO's data is a Level 3 and will require permission from the data custodian. 
+
+> Create your **free** account now before continuing with this tutorial
+
+## Installing packages {#Data1.2}
+
+You can install naturecounts from GitHub with the remotes package. Throughout this tutorial we also use the [tidyverse](https://www.tidyverse.org/) R package, which is actually a collection of R packages for data science, including tidyr, dplyr, and ggplot2, among others. The tidyverse package can be installed from CRAN.
+
+```{r install, eval = FALSE}
+install.packages("remotes")
+remotes::install_github("BirdStudiesCanada/naturecounts")
+
+install.packages("tidyverse")
+```
+
+After installation, you need to load the package each time you open a new R session.
+
+```{r library, eval = FALSE}
+library(naturecounts)
+library(tidyverse)
+```
+
+## Download data {#Data1.3}
+
+Now you are ready to download the data! The LBPO data set is rather large, so it will be downloaded and saved to your working directory for future use. During subsequent iterations, you will just need to download the most recent years data for appending to the old file. 
+
+Note: The code below extracts the CMMN-DET data set. In this data set there are different column which represent different count types. 
+
+ObservationCount = Daily Estimated Totals
+ObservationCount2 = DST
+ObservationCount3 = Census
+ObservationCount4 = Number Banded
+ObservationCount5 = Other (recap, stopover, repeat)
+ObservationCount6 = Other (visual migration, observations outside of census)
+
+> Use your personal username. You will be promted for your password. The request_id will be sent to you in an email once your data request have been approved. 
+
+```{r download, eval = FALSE}
+#Download all the data
+#You will get a warring that this is a large data set to download. Select '1' to proceed.This will take a couple minutes.
+
+LPBO_all <- nc_data_dl(collections = "CMMN-DET-LPBO", username = "yourusername", info = "station summaries", field_set = "extended", request_id = 000000)
+
+#Save to your local working directory
+#You can change your working directory using Session > Set Working Directory > Choose Directory
+
+write.csv(LPBO_all, "LPBO.rawdata.Sept2021.csv")
+
+#To load the raw data from your working directory during a subsequent session, use the following code. Make sure R is looking in the right directory! 
+
+LPBO_all<-read.csv("LPBO.rawdata.Sept2021.csv")
+
+#Download most recent data. Change the year value accordingly.Save the file and add it to the raw file saved previously.
+
+LPBO_yr <- nc_data_dl(collections = "CMMN-DET-LPBO", year=2020, username = "yourusername", info = "station summaries", field_set = "extended", request_id = 000000)
+
+```
+
+## Manipulate data {#Data1.4}
+
+Congrats! You just downloaded a lot of data, some of which you don't need. Now we will select the important columns and create a few extra fields that you will want for your data summaries. 
+
+```{r select, eval = FALSE}
+
+#Select the columns of interest
+LPBO<-LPBO_all %>% select(ProjectCode, survey_year, survey_month, survey_day, species_id, ObservationCount, ObservationCount3, ObservationCount4, ObservationCount5)
+
+#assign doy using the naturecounts helper function
+LPBO <- format_dates(LPBO)
+
+#now assign season using the doy column     
+LPBO <- LPBO %>% mutate(season = if_else(doy < 180, "Spring", "Fall"))
+
+#rename columns for ease of use moving forward
+LPBO<-LPBO %>% rename(DET=ObservationCount, Census=ObservationCount3, Banded=ObservationCount4, Recap=ObservationCount5, SpeciesCode)
+
+
+#write this file to your working directory if you wish to save it for future use. 
+
+write.csv(LPBO, "LPBO_Sept2021.csv")
+
+```
+
