@@ -76,7 +76,7 @@ Congrats! You just downloaded a lot of data, some of which you don't need. Now w
 ```{r select, eval = FALSE}
 
 #Select the columns of interest
-LPBO<-LPBO_all %>% select(ProjectCode, survey_year, survey_month, survey_day, species_id, ObservationCount, ObservationCount3, ObservationCount4, ObservationCount5, SpeciesCode)
+LPBO<-LPBO_all %>% select(SiteCode, survey_year, survey_month, survey_day, SpeciesCode, species_id, ObservationCount, ObservationCount3, ObservationCount4, ObservationCount5)
 
 #assign doy using the naturecounts helper function
 LPBO <- format_dates(LPBO)
@@ -93,4 +93,5 @@ LPBO<-LPBO %>% rename(DET=ObservationCount, Census=ObservationCount3, Banded=Obs
 write.csv(LPBO, "LPBO_Sept2021.csv")
 
 ```
+
 

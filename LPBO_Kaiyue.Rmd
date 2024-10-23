@@ -1,0 +1,100 @@
+---
+title: "Kaiyue Sample R Scripts"
+author: "Danielle Ethier"
+date: "2023-11-15"
+output: html_document
+editor_options: 
+  chunk_output_type: console
+---
+
+#Start by pulling your raw data into R using the 'request_id'
+
+```{r download data}
+
+#install and load packages
+install.packages("naturecounts", 
+                 repos = c(birdscanada = 'https://birdscanada.r-universe.dev',
+                           CRAN = 'https://cloud.r-project.org'))
+library(naturecounts)
+library(tidyverse)
+require(lubridate)
+
+#create an output directory
+if(!dir.exists("Output")) dir.create("Output")
+out.dir <- paste("./Output/", sep = "")
+dir.create(out.dir, showWarnings=FALSE, recursive=TRUE)
+
+#you will be promted for your password
+data<-nc_data_dl(username = "yourusername", request_id= 0000000, fields_set = "extended", info="data download for school project")
+
+#Danielle's data download
+data<-nc_data_dl(username="dethier", collection="CMMN-DET-LPBO", years = c(1990, 2020), info="data check for student", fields_set = "extended")
+
+#write a local copy to the data for future use
+write.csv(data, "raw.LPBO.data.csv") #save a local copy
+
+```
+
+#now clean the data and create events layer
+
+```{r data clean}
+
+dat<-data %>% select(SamplingEventIdentifier, SpeciesCode, SiteCode, survey_year, survey_month, survey_day, ObservationCount) %>%  filter(survey_year >= 1990, survey_year <= 2020) %>% filter(SiteCode!="LPBO2") #LPBO2 == Breakwater, should already be filtered for year
+
+dat$ObservationCount<-as.integer(dat$ObservationCount)
+
+## Assign date and season variables
+dat <- dat %>%
+  mutate(date = ymd(paste(survey_year, survey_month, survey_day, sep = "/")),
+         doy = yday(date),
+         season = if_else(doy < 180, "Spring", "Fall"))
+
+#create a sampling event layer         
+event.data <- dat %>%
+  filter(ObservationCount > 0) %>%
+  group_by(SamplingEventIdentifier, SiteCode, survey_year, survey_month, survey_day, date, season, doy) %>%
+  mutate(nspecies = n()) %>%
+  filter(nspecies > 1) %>% 
+  select(SamplingEventIdentifier, SiteCode, survey_year, survey_month, survey_day, date, season, doy) %>% 
+  distinct() %>%
+  ungroup() %>%
+  as.data.frame()
+
+#look as species list
+dat<-dat %>% arrange(SpeciesCode)
+list(unique(dat$SpeciesCode)) #PAWA, YRWA, YWAR appear on my list
+
+  
+#create a species and season vector
+species.list<-c("BAWW") #add your species list
+
+#species and season loop
+for(k in 1:length(species.list)) {
+  
+   sp.data<-NULL
+  sp.data <- dat %>% filter(SpeciesCode == species.list[k]) %>% distinct(SamplingEventIdentifier,survey_year, survey_month, survey_day, season, .keep_all = TRUE)
+  
+#zero-fill by merging event and real data.  
+  
+  sp.data <- left_join(event.data, sp.data, by = c("SamplingEventIdentifier", "SiteCode", "survey_year", "survey_month", "survey_day", "date", "season", "doy")) %>%
+    mutate(ObservationCount = replace(ObservationCount, is.na(ObservationCount), 0))
+  
+  sp.data$SpeciesCode <- species.list[k]
+
+  write.table(sp.data, 
+              file = paste(out.dir, species.list[k], "_Data.csv", sep = ""),
+              row.names = FALSE, 
+              append = TRUE, 
+              quote = FALSE, 
+              sep = ",", 
+              col.names = TRUE)
+  
+#within this loop you can add other code specific to a species. Also think about how you could add another loop to seperate seasons. 
+  
+
+} #end species loop
+
+
+```
+ 
+ 
